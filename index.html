@@ -136,6 +136,17 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--slime); out
 .drawer { display: flex; flex-direction: column; align-items: center; gap: 6px; opacity: 0; animation: ghostin .6s forwards; }
 .drawer .cap { color: var(--ghost-dim); font-weight: 700; }
 .drawer .num { font-family: var(--num); font-size: clamp(4rem, 24vw, 6.5rem); line-height: 1; color: #3a2a10; background: #fff36b; padding: 6px 22px; border-radius: 6px; box-shadow: 0 0 40px rgba(255,243,107,.35); transform: rotate(-3deg); }
+.tm-text { margin: 0; font-size: 1rem; line-height: 1.45; color: var(--ghost-dim); max-width: 34ch; }
+.tm-ring { position: relative; width: min(70vw, 260px); aspect-ratio: 1; max-width: 100%; display: grid; place-items: center; }
+.tm-ring svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+.tm-track { fill: none; stroke: var(--mist); stroke-width: 12; }
+.tm-bar { fill: none; stroke: var(--pumpkin); stroke-width: 12; stroke-linecap: round; stroke-dasharray: 553; stroke-dashoffset: 0; transition: stroke .3s; }
+.tm-num { font-family: var(--num); font-size: clamp(4rem, 22vw, 6rem); line-height: 1; font-variant-numeric: tabular-nums; color: var(--ghost); }
+.tm-ring.hurry .tm-bar { stroke: var(--blood); }
+.tm-ring.hurry .tm-num { color: var(--blood); animation: beat .5s infinite; }
+.tm-ring.over .tm-num { font-family: var(--display); font-size: clamp(2.6rem, 13vw, 3.6rem); color: var(--blood); animation: none; }
+@keyframes beat { 0%,100% { transform: scale(1); } 30% { transform: scale(1.14); } }
+.chrono { display: inline-flex; align-items: center; gap: 8px; align-self: flex-start; font-weight: 700; font-size: .95rem; color: var(--pumpkin); background: transparent; border: 1px solid var(--pumpkin); border-radius: 999px; padding: 9px 16px; cursor: pointer; }
 #wordPanel.flash { animation: flash 1.2s ease-out 2; }
 @keyframes flash { 0% { border-color: var(--blood); box-shadow: 0 0 0 4px rgba(255,77,109,.35), 0 0 30px rgba(255,77,109,.4); } 100% { border-color: var(--mist); box-shadow: none; } }
 .rev-actions { opacity: 0; animation: ghostin .5s 2.2s forwards; }
@@ -197,6 +208,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--slime); out
       <div class="panel">
         <div class="row between"><p class="label">Défi du tour</p><button class="small" id="nextChal" type="button">Autre défi</button></div>
         <p class="challenge" id="challenge"></p>
+        <button class="chrono" id="chronoBtn" type="button" hidden>⏱ Lancer le chrono</button>
         <button class="big" id="lostBtn" type="button">Qui a perdu ?</button>
       </div>
 
@@ -250,6 +262,28 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--slime); out
       <button class="big" id="revOk" type="button" style="max-width:260px">C'est ouvert !</button>
       <button class="small" id="revJoker" type="button">Utiliser son joker</button>
       <button class="small" id="revRepeat" type="button">Répéter</button>
+    </div>
+  </div>
+</div>
+
+<!-- Timer -->
+<div class="overlay" id="timer" hidden>
+  <div class="sheet">
+    <p class="reason" id="tmLabel">Chrono</p>
+    <p class="tm-text" id="tmText"></p>
+    <div class="tm-ring" id="tmRing">
+      <svg viewBox="0 0 200 200" aria-hidden="true">
+        <circle cx="100" cy="100" r="88" class="tm-track"/>
+        <circle cx="100" cy="100" r="88" class="tm-bar" id="tmBar"/>
+      </svg>
+      <span class="tm-num" id="tmNum">10</span>
+    </div>
+    <div class="row center" id="tmRun">
+      <button class="small" id="tmStop" type="button">Arrêter le chrono</button>
+    </div>
+    <div class="row center" id="tmDone" hidden>
+      <button class="big" id="tmLost" type="button" style="max-width:260px">Qui a perdu ?</button>
+      <button class="small" id="tmClose" type="button">Personne, fermer</button>
     </div>
   </div>
 </div>
@@ -397,7 +431,10 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--slime); out
     var left = 4 - (S.drawn.length % 4);
     $("word").textContent = "« " + wordNow() + " »";
     $("wordLeft").textContent = S.drawn.length >= MAX ? "" : "change dans " + left + " case" + (left > 1 ? "s" : "");
-    $("challenge").textContent = CHALLENGES[S.chal[S.chalPos % S.chal.length]];
+    var chText = CHALLENGES[S.chal[S.chalPos % S.chal.length]], secs = timeOf(chText);
+    $("challenge").textContent = chText;
+    $("chronoBtn").hidden = !secs || S.drawn.length >= MAX;
+    if (secs) $("chronoBtn").textContent = "⏱ Lancer le chrono · " + (secs >= 60 ? "1 min" : secs + " s");
     $("count").textContent = S.drawn.length + " / " + MAX;
     var last = S.drawn.length ? S.drawn[S.drawn.length - 1].n : 0;
     var html = "";
@@ -512,6 +549,128 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--slime); out
     armGhost();
   });
 
+  /* ---------- Chrono + anxious music ---------- */
+  function timeOf(t) {
+    if (/ferme(z|nt)? les yeux/i.test(t)) return 0;
+    var m = t.match(/(\d+)\s*secondes/); if (m) return +m[1];
+    if (/une minute/.test(t)) return 60;
+    return 0;
+  }
+  var TM = null, CIRC = 553;
+  function blip(c, at, freq, dur, vol, type, dest) {
+    var o = c.createOscillator(), g = c.createGain();
+    o.type = type || "sine"; o.frequency.setValueAtTime(freq, at);
+    g.gain.setValueAtTime(0.0001, at); g.gain.exponentialRampToValueAtTime(vol, at + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+    o.connect(g); g.connect(dest); o.start(at); o.stop(at + dur + 0.05);
+    return o;
+  }
+  function heartbeat(c, at, vol, dest) {
+    [0, 0.2].forEach(function (d, i) {
+      var o = c.createOscillator(), g = c.createGain();
+      o.frequency.setValueAtTime(i ? 52 : 62, at + d); o.frequency.exponentialRampToValueAtTime(30, at + d + 0.18);
+      g.gain.setValueAtTime(0.0001, at + d); g.gain.exponentialRampToValueAtTime(vol * (i ? 0.7 : 1), at + d + 0.015); g.gain.exponentialRampToValueAtTime(0.0001, at + d + 0.22);
+      o.connect(g); g.connect(dest); o.start(at + d); o.stop(at + d + 0.3);
+    });
+  }
+  function startMusic(total) {
+    if (!S.sound) return null;
+    var c = audio(); if (!c) return null;
+    var t = c.currentTime, out = c.createGain();
+    out.gain.setValueAtTime(0.0001, t); out.gain.exponentialRampToValueAtTime(0.9, t + 1);
+    out.connect(c.destination);
+    var nodes = [];
+    // low drone, filter opens as time runs out
+    var lp = c.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.setValueAtTime(180, t); lp.frequency.linearRampToValueAtTime(1600, t + total);
+    var dg = c.createGain(); dg.gain.value = 0.12; lp.connect(dg); dg.connect(out);
+    [65.4, 69.3, 98].forEach(function (f) { var o = c.createOscillator(); o.type = "sawtooth"; o.frequency.value = f; o.connect(lp); o.start(t); nodes.push(o); });
+    // high dissonant strings with tremolo, rising in pitch and volume
+    var hg = c.createGain(); hg.gain.setValueAtTime(0.0001, t); hg.gain.exponentialRampToValueAtTime(0.06, t + total);
+    var trem = c.createOscillator(), tg = c.createGain(); trem.frequency.setValueAtTime(4, t); trem.frequency.linearRampToValueAtTime(11, t + total); tg.gain.value = 0.04;
+    trem.connect(tg); tg.connect(hg.gain); trem.start(t); nodes.push(trem);
+    hg.connect(out);
+    [880, 932.3].forEach(function (f) { var o = c.createOscillator(); o.type = "triangle"; o.frequency.setValueAtTime(f, t); o.frequency.linearRampToValueAtTime(f * 1.5, t + total); o.connect(hg); o.start(t); nodes.push(o); });
+    // heartbeat + ticks scheduled ahead
+    var next = t + 0.3, endAt = t + total;
+    var sched = setInterval(function () {
+      while (next < c.currentTime + 0.3 && next < endAt) {
+        var p = Math.min(1, (next - t) / total), gap = 1.0 - 0.62 * p;
+        heartbeat(c, next, 0.5 + 0.4 * p, out);
+        next += gap;
+      }
+    }, 60);
+    var tickNext = t + 1;
+    var tick = setInterval(function () {
+      while (tickNext < c.currentTime + 0.3 && tickNext < endAt + 0.01) {
+        var left = Math.round(endAt - tickNext);
+        blip(c, tickNext, left <= 5 ? 2200 : 1600, 0.05, left <= 5 ? 0.25 : 0.1, "square", out);
+        tickNext += 1;
+      }
+    }, 60);
+    return {
+      stop: function (fade) {
+        clearInterval(sched); clearInterval(tick);
+        var now = c.currentTime;
+        out.gain.cancelScheduledValues(now); out.gain.setValueAtTime(out.gain.value || 0.5, now); out.gain.exponentialRampToValueAtTime(0.0001, now + (fade || 0.15));
+        nodes.forEach(function (o) { try { o.stop(now + (fade || 0.15) + 0.05); } catch (e) {} });
+      }
+    };
+  }
+  function buzzer() {
+    if (!S.sound) return;
+    var c = audio(); if (!c) return;
+    var t = c.currentTime, g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.45, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + 1.4);
+    g.connect(c.destination);
+    [110, 116.5, 155.6].forEach(function (f) { var o = c.createOscillator(); o.type = "sawtooth"; o.frequency.setValueAtTime(f, t); o.frequency.exponentialRampToValueAtTime(f * 0.6, t + 1.4); o.connect(g); o.start(t); o.stop(t + 1.5); });
+  }
+  function openTimer(text, secs) {
+    unlockVoice();
+    if ("speechSynthesis" in window) speechSynthesis.cancel();
+    $("tmText").textContent = text;
+    $("tmLabel").textContent = "Chrono · " + (secs >= 60 ? "1 min" : secs + " s");
+    $("tmRun").hidden = false; $("tmDone").hidden = true;
+    $("tmRing").className = "tm-ring";
+    $("tmBar").style.strokeDashoffset = 0;
+    $("timer").hidden = false;
+    var start = performance.now(), dur = secs * 1000;
+    TM = { music: startMusic(secs), raf: 0, done: false };
+    function frame() {
+      if (!TM || TM.done) return;
+      var el = performance.now() - start, left = Math.max(0, dur - el), s = Math.ceil(left / 1000);
+      $("tmNum").textContent = s;
+      $("tmBar").style.strokeDashoffset = (CIRC * el / dur).toFixed(1);
+      $("tmRing").className = "tm-ring" + (s <= 5 ? " hurry" : "");
+      if (left <= 0) return finishTimer(true);
+      TM.raf = requestAnimationFrame(frame);
+    }
+    frame();
+    TM.iv = setInterval(function () { if (TM && !TM.done && performance.now() - start >= dur) finishTimer(true); }, 250);
+  }
+  function finishTimer(natural) {
+    if (!TM || TM.done) return;
+    TM.done = true; cancelAnimationFrame(TM.raf); clearInterval(TM.iv);
+    if (TM.music) TM.music.stop(natural ? 0.1 : 0.3);
+    $("tmNum").textContent = natural ? "Temps écoulé !" : "Stop";
+    $("tmBar").style.strokeDashoffset = natural ? CIRC : $("tmBar").style.strokeDashoffset;
+    $("tmRing").className = "tm-ring over";
+    $("tmRun").hidden = true; $("tmDone").hidden = false;
+    if (natural) { buzzer(); say("Temps écoulé !", 300); }
+  }
+  function closeTimer() {
+    if (TM && !TM.done) finishTimer(false);
+    TM = null; $("timer").hidden = true; armGhost();
+  }
+  $("chronoBtn").addEventListener("click", function () {
+    var t = CHALLENGES[S.chal[S.chalPos % S.chal.length]];
+    openTimer(t, timeOf(t));
+  });
+  $("tmStop").addEventListener("click", function () { finishTimer(false); });
+  $("tmClose").addEventListener("click", closeTimer);
+  $("tmLost").addEventListener("click", function () {
+    closeTimer();
+    pick("Qui a perdu le défi ?", null, function (name) { S.chalPos++; victim(name, "lost"); });
+  });
+
   function flashWord() {
     var el = $("wordPanel"); el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash");
     el.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -538,7 +697,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--slime); out
   function armGhost() { ghostAt = Date.now() + (4 + Math.random() * 6) * 60000; }
   setInterval(function () {
     if (!S.started || !S.ghost || S.drawn.length >= MAX || S.players.length < 1) return;
-    if (!$("reveal").hidden || !$("picker").hidden || !$("end").hidden || document.hidden) return;
+    if (!$("reveal").hidden || !$("picker").hidden || !$("end").hidden || !$("timer").hidden || document.hidden) return;
     if (!ghostAt) armGhost();
     if (Date.now() >= ghostAt) {
       ghostAt = Infinity;
