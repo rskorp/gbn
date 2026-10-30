@@ -1,0 +1,13 @@
+{
+  "name": "GhostBoukiNight Apero game",
+  "short_name": "GhostBouki",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#120f1f",
+  "theme_color": "#120f1f",
+  "icons": [
+    { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml" },
+    { "src": "apple-touch-icon.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

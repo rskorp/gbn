@@ -1,0 +1,582 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#120f1f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="GhostBouki">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<title>GhostBoukiNight Apero game</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Creepster&family=Bungee&family=Figtree:wght@400;600;700&display=swap">
+<style>
+/* Layout: one column night scene. Setup (players) → game (word, challenge, actions, 24-drawer board, scores). Full-screen reveal overlay for each victim. Single dark look by choice. */
+:root {
+  --night: #120f1f;
+  --night-2: #1d1830;
+  --mist: #2c2545;
+  --ghost: #ece8f7;
+  --ghost-dim: #9a93b5;
+  --pumpkin: #ff8a2a;
+  --pumpkin-deep: #d35f0a;
+  --slime: #9fe870;
+  --blood: #ff4d6d;
+  --wood: #8a5a33;
+  --display: "Creepster", "Impact", fantasy;
+  --num: "Bungee", "Arial Black", sans-serif;
+  --body: "Figtree", system-ui, -apple-system, sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { min-height: 100%; }
+body {
+  background: radial-gradient(120% 70% at 50% 0%, var(--night-2) 0%, var(--night) 60%) fixed, var(--night);
+  color: var(--ghost);
+  font-family: var(--body);
+  font-size: 16px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 40px;
+  overflow-x: hidden;
+}
+.wrap { max-width: 560px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+header { text-align: center; display: flex; flex-direction: column; gap: 4px; }
+h1 {
+  font-family: var(--display); font-weight: 400;
+  font-size: clamp(2.3rem, 10vw, 3.4rem); line-height: 1; margin: 0;
+  color: var(--pumpkin); text-shadow: 0 0 18px rgba(255,138,42,.45); letter-spacing: .02em;
+}
+.sub { margin: 0; color: var(--ghost-dim); text-transform: uppercase; letter-spacing: .22em; font-size: .75rem; font-weight: 700; }
+.label { margin: 0; font-size: .72rem; text-transform: uppercase; letter-spacing: .2em; color: var(--ghost-dim); font-weight: 700; }
+
+.panel { background: var(--night-2); border: 1px solid var(--mist); border-radius: 18px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+
+/* Buttons */
+button { font-family: var(--body); -webkit-tap-highlight-color: transparent; }
+button:focus-visible, input:focus-visible { outline: 3px solid var(--slime); outline-offset: 3px; }
+.big {
+  font-family: var(--num); font-size: 1.05rem; letter-spacing: .03em;
+  color: var(--night); background: var(--pumpkin); border: 0; border-radius: 999px;
+  padding: 16px 24px; width: 100%; cursor: pointer;
+  box-shadow: 0 5px 0 var(--pumpkin-deep), 0 10px 26px rgba(255,138,42,.3);
+  transition: transform .08s, box-shadow .08s;
+}
+.big:active:not(:disabled) { transform: translateY(4px); box-shadow: 0 1px 0 var(--pumpkin-deep); }
+.big:disabled { background: var(--mist); color: var(--ghost-dim); box-shadow: none; }
+.big.alt { background: var(--ghost); box-shadow: 0 5px 0 #b9b0d6, 0 10px 26px rgba(236,232,247,.15); }
+.small {
+  font-weight: 700; font-size: .88rem; background: transparent; color: var(--ghost-dim);
+  border: 1px solid var(--mist); border-radius: 999px; padding: 9px 16px; cursor: pointer;
+}
+.small.on { color: var(--slime); border-color: var(--slime); }
+.small.danger { color: var(--pumpkin); border-color: var(--pumpkin); }
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.row.center { justify-content: center; }
+.row.between { justify-content: space-between; }
+
+/* Setup */
+.adder { display: flex; gap: 8px; }
+.adder input {
+  flex: 1; min-width: 0; font: inherit; font-size: 1rem; color: var(--ghost);
+  background: var(--night); border: 1px solid var(--mist); border-radius: 12px; padding: 12px 14px;
+}
+.adder button { flex: none; font-family: var(--num); background: var(--ghost); color: var(--night); border: 0; border-radius: 12px; padding: 0 16px; font-size: 1.2rem; cursor: pointer; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; background: var(--mist); border-radius: 999px; padding: 6px 6px 6px 14px; font-weight: 600; }
+.chip button { background: var(--night); color: var(--ghost-dim); border: 0; border-radius: 50%; width: 26px; height: 26px; cursor: pointer; font-size: .9rem; }
+.hint { margin: 0; color: var(--ghost-dim); font-size: .9rem; line-height: 1.5; }
+
+/* Game */
+.word { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.word .w { font-family: var(--num); font-size: clamp(1.4rem, 7vw, 1.9rem); color: var(--blood); line-height: 1.1; overflow-wrap: anywhere; }
+.word .left { color: var(--ghost-dim); font-size: .82rem; text-align: right; flex: none; }
+.challenge { font-size: 1.12rem; line-height: 1.45; font-weight: 600; margin: 0; text-wrap: pretty; }
+.ghostbar { display: flex; align-items: center; gap: 10px; color: var(--ghost-dim); font-size: .9rem; }
+.ghostbar .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--mist); flex: none; }
+.ghostbar.live .dot { background: var(--slime); box-shadow: 0 0 10px var(--slime); animation: pulse 2s infinite; }
+@keyframes pulse { 50% { opacity: .35; } }
+
+.board { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; background: var(--wood); padding: 8px; border-radius: 12px; }
+.cell {
+  aspect-ratio: 1.6; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  background: #5a3a20; border: 1px solid #3f2814; color: #f3d98a; min-width: 0;
+}
+.cell .n { font-family: var(--num); font-size: clamp(.9rem, 4vw, 1.1rem); font-variant-numeric: tabular-nums; background: #fff36b; color: #3a2a10; padding: 0 6px; border-radius: 2px; }
+.cell .who { font-size: .68rem; font-weight: 700; max-width: 100%; padding: 0 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ghost); }
+.cell.open { background: var(--night); border-color: var(--night); }
+.cell.open .n { background: var(--mist); color: var(--ghost-dim); }
+.cell.last { box-shadow: 0 0 0 2px var(--pumpkin), 0 0 14px rgba(255,138,42,.6); }
+
+.scores { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.scores li { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--mist); }
+.scores li:last-child { border-bottom: 0; }
+.scores .nm { flex: 1; min-width: 0; font-weight: 700; overflow-wrap: anywhere; }
+.scores .cs { color: var(--ghost-dim); font-size: .82rem; font-variant-numeric: tabular-nums; }
+.scores .ct { font-family: var(--num); font-variant-numeric: tabular-nums; min-width: 2ch; text-align: right; }
+.jk { font-size: .72rem; font-weight: 700; color: var(--slime); border: 1px solid var(--slime); border-radius: 999px; padding: 1px 7px; }
+.jk.used { color: var(--ghost-dim); border-color: var(--mist); text-decoration: line-through; }
+
+/* Overlays */
+.overlay {
+  position: fixed; inset: 0; z-index: 50; background: rgba(8,6,16,.94);
+  display: flex; align-items: center; justify-content: center;
+  padding: max(20px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(20px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+  overflow-y: auto;
+}
+.sheet { width: 100%; max-width: 440px; display: flex; flex-direction: column; gap: 16px; text-align: center; align-items: center; }
+.reason { margin: 0; color: var(--ghost-dim); text-transform: uppercase; letter-spacing: .2em; font-size: .8rem; font-weight: 700; }
+.victim { margin: 0; font-family: var(--display); font-weight: 400; font-size: clamp(3rem, 16vw, 5.2rem); line-height: 1; color: var(--blood); text-shadow: 0 0 24px rgba(255,77,109,.5); overflow-wrap: anywhere; }
+.victim span { display: inline-block; opacity: 0; animation: ghostin .5s forwards; }
+@keyframes ghostin { from { opacity: 0; transform: translateY(12px) scale(.8); filter: blur(6px); } to { opacity: 1; transform: none; filter: none; } }
+.drawer { display: flex; flex-direction: column; align-items: center; gap: 6px; opacity: 0; animation: ghostin .6s forwards; }
+.drawer .cap { color: var(--ghost-dim); font-weight: 700; }
+.drawer .num { font-family: var(--num); font-size: clamp(4rem, 24vw, 6.5rem); line-height: 1; color: #3a2a10; background: #fff36b; padding: 6px 22px; border-radius: 6px; box-shadow: 0 0 40px rgba(255,243,107,.35); transform: rotate(-3deg); }
+#wordPanel.flash { animation: flash 1.2s ease-out 2; }
+@keyframes flash { 0% { border-color: var(--blood); box-shadow: 0 0 0 4px rgba(255,77,109,.35), 0 0 30px rgba(255,77,109,.4); } 100% { border-color: var(--mist); box-shadow: none; } }
+.rev-actions { opacity: 0; animation: ghostin .5s 2.2s forwards; }
+.overlay.shake .sheet { animation: shake .5s linear; }
+@keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-10px)} 40%{transform:translateX(9px)} 60%{transform:translateX(-6px)} 80%{transform:translateX(4px)} }
+.pick { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; width: 100%; }
+.pick button { font-weight: 700; font-size: 1rem; background: var(--night-2); color: var(--ghost); border: 1px solid var(--mist); border-radius: 14px; padding: 16px 10px; cursor: pointer; overflow-wrap: anywhere; }
+.pick button:active { background: var(--mist); }
+.pick-title { margin: 0; font-family: var(--num); font-size: 1.3rem; }
+.end-list { list-style: none; margin: 0; padding: 0; width: 100%; display: flex; flex-direction: column; gap: 8px; text-align: left; }
+.end-list li { display: flex; gap: 12px; align-items: baseline; background: var(--night-2); border-radius: 12px; padding: 12px 14px; }
+.end-list .rk { font-family: var(--num); color: var(--pumpkin); width: 2ch; }
+.end-list .nm { flex: 1; font-weight: 700; min-width: 0; overflow-wrap: anywhere; }
+
+.ghosts { position: fixed; inset: 0; pointer-events: none; z-index: -1; overflow: hidden; }
+.ghosts svg { position: absolute; opacity: .07; fill: var(--ghost); animation: float 9s ease-in-out infinite; }
+@keyframes float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-18px); } }
+@media (prefers-reduced-motion: reduce) {
+  .ghosts svg, .overlay.shake .sheet, .ghostbar.live .dot { animation: none; }
+  .victim span, .drawer { animation-duration: .01s; }
+}
+</style>
+<style>[hidden]{display:none!important}body{margin:0;padding-top:max(20px,env(safe-area-inset-top,0px))!important}</style>
+</head>
+<body>
+<div class="ghosts" aria-hidden="true">
+  <svg style="left:4%;top:12%;width:70px" viewBox="0 0 60 70"><path d="M30 2C14 2 4 14 4 30v38l9-8 8 8 9-8 9 8 8-8 9 8V30C56 14 46 2 30 2z"/></svg>
+  <svg style="right:6%;top:45%;width:90px;animation-delay:-3s" viewBox="0 0 60 70"><path d="M30 2C14 2 4 14 4 30v38l9-8 8 8 9-8 9 8 8-8 9 8V30C56 14 46 2 30 2z"/></svg>
+  <svg style="left:10%;bottom:6%;width:56px;animation-delay:-6s" viewBox="0 0 60 70"><path d="M30 2C14 2 4 14 4 30v38l9-8 8 8 9-8 9 8 8-8 9 8V30C56 14 46 2 30 2z"/></svg>
+</div>
+
+<main class="wrap">
+  <header>
+    <h1>GhostBoukiNight</h1>
+    <p class="sub">Apero game · 24 cases</p>
+  </header>
+
+  <!-- SETUP -->
+  <section id="setup" class="panel">
+    <p class="label">Les joueurs</p>
+    <form class="adder" id="addForm">
+      <input id="nameInput" type="text" placeholder="Prénom" autocomplete="off" maxlength="20" aria-label="Prénom du joueur">
+      <button type="submit" aria-label="Ajouter">+</button>
+    </form>
+    <div class="chips" id="chips"></div>
+    <p class="hint" id="setupHint">Ajoute au moins 2 joueurs. Monte le son du téléphone : le Fantôme parle.</p>
+    <button class="big" id="startBtn" type="button" disabled>Lancer la nuit</button>
+  </section>
+
+  <!-- GAME -->
+  <section id="game" hidden>
+    <div class="wrap" style="gap:16px">
+      <div class="panel" id="wordPanel">
+        <p class="label">Mot interdit</p>
+        <div class="word"><span class="w" id="word"></span><span class="left" id="wordLeft"></span></div>
+        <button class="big alt" id="saidBtn" type="button">Quelqu'un l'a dit !</button>
+      </div>
+
+      <div class="panel">
+        <div class="row between"><p class="label">Défi du tour</p><button class="small" id="nextChal" type="button">Autre défi</button></div>
+        <p class="challenge" id="challenge"></p>
+        <button class="big" id="lostBtn" type="button">Qui a perdu ?</button>
+      </div>
+
+      <div class="panel">
+        <div class="row between">
+          <div class="ghostbar" id="ghostbar"><span class="dot"></span><span id="ghostTxt">Le Fantôme rôde…</span></div>
+          <button class="small on" id="ghostToggle" type="button">Fantôme activé</button>
+        </div>
+        <p class="hint">De temps en temps, le Fantôme désigne une victime au hasard. Garde l'écran allumé.</p>
+      </div>
+
+      <div class="panel">
+        <div class="row between"><p class="label">Le meuble</p><span class="label" id="count">0 / 24</span></div>
+        <div class="board" id="board"></div>
+        <button class="big alt" id="againBtn" type="button">Le meuble en redemande</button>
+        <p class="hint" style="margin:0">Quand une case ordonne à quelqu'un d'en ouvrir une autre.</p>
+      </div>
+
+      <div class="panel">
+        <p class="label">Qui a ouvert quoi</p>
+        <ul class="scores" id="scores"></ul>
+      </div>
+
+      <div class="row center" id="foot">
+        <button class="small on" id="soundToggle" type="button">Son activé</button>
+        <button class="small" id="resetBtn" type="button">Nouvelle partie</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- Player picker -->
+<div class="overlay" id="picker" hidden>
+  <div class="sheet">
+    <p class="pick-title" id="pickTitle">Qui a perdu ?</p>
+    <div class="pick" id="pickList"></div>
+    <button class="small" id="pickCancel" type="button">Annuler</button>
+  </div>
+</div>
+
+<!-- Reveal -->
+<div class="overlay" id="reveal" hidden>
+  <div class="sheet">
+    <p class="reason" id="revReason"></p>
+    <p class="victim" id="revName"></p>
+    <div class="drawer" id="revDrawer" style="animation-delay:1.6s">
+      <span class="cap">va ouvrir la case</span>
+      <span class="num" id="revNum"></span>
+    </div>
+    <div class="row center rev-actions" id="revActions">
+      <button class="big" id="revOk" type="button" style="max-width:260px">C'est ouvert !</button>
+      <button class="small" id="revJoker" type="button">Utiliser son joker</button>
+      <button class="small" id="revRepeat" type="button">Répéter</button>
+    </div>
+  </div>
+</div>
+
+<!-- End -->
+<div class="overlay" id="end" hidden>
+  <div class="sheet">
+    <p class="reason">Le meuble est vide</p>
+    <p class="victim" style="font-size:clamp(2.4rem,12vw,3.6rem)">Fin de la nuit</p>
+    <ol class="end-list" id="endList"></ol>
+    <button class="small" id="endClose" type="button">Voir le meuble</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  var MAX = 24, KEY = "ghostbouki-v2";
+  var WORDS = ["oui", "non", "quoi", "genre", "trop", "voilà", "d'accord", "en fait", "carrément", "attends", "merci", "vraiment", "franchement", "grave", "ok", "bref", "pourquoi", "normal", "du coup", "sérieux"];
+  var CHALLENGES = [
+    "Le joueur à ta gauche cite 5 marques de voiture en 10 secondes. Raté ? Il a perdu.",
+    "Tout le monde pointe du doigt celui qui arriverait en retard à son propre mariage. Le plus désigné perd.",
+    "Pierre-feuille-ciseaux entre les deux joueurs les plus proches du meuble.",
+    "Mime un métier en 30 secondes. Si personne ne trouve, tu as perdu.",
+    "Cite 5 pays qui commencent par M en 10 secondes.",
+    "Tour de table : chacun dit un fruit, sans hésiter ni répéter. Le premier qui sèche perd.",
+    "Raconte une blague. Si personne ne rit, tu as perdu.",
+    "Le plus jeune et le plus âgé se regardent dans les yeux. Le premier qui rit perd.",
+    "Tour de table : un film avec un animal dans le titre. Le premier qui sèche perd.",
+    "Fredonne un tube, les autres ont 20 secondes pour trouver le titre. Sinon, tu as perdu.",
+    "Celui dont le téléphone est le moins chargé perd.",
+    "On compte de 1 à 20 en tour de table, en disant « Bouki » à la place de chaque multiple de 3. Le premier qui se trompe perd.",
+    "Cite 5 joueurs de foot français en 10 secondes.",
+    "Vote à main levée : qui a la pire playlist ? Le plus désigné perd.",
+    "Bras de fer entre les deux joueurs à ta droite.",
+    "Tour de table : un mot qui rime avec « apéro ». Le premier qui sèche perd.",
+    "Imite un joueur. Si les autres ne trouvent pas qui, tu as perdu.",
+    "Celui dont l'anniversaire est le plus proche de Noël perd.",
+    "Chaise invisible contre le mur pendant 30 secondes. Si tu craques, tu as perdu.",
+    "Tour de table : une capitale européenne. Le premier qui sèche ou se trompe perd.",
+    "Tout le monde ferme les yeux et lève la main quand il pense que 15 secondes sont passées. Le plus éloigné perd.",
+    "Vote : qui mourrait en premier dans un film d'horreur ? Le plus désigné perd.",
+    "Ni oui ni non : ton voisin de droite te pose des questions pendant une minute.",
+    "Cite 5 fromages en 5 secondes.",
+    "Tour de table : un prénom qui commence par la même lettre que le tien. Le premier qui sèche perd.",
+    "Dis l'alphabet à l'envers de M à A sans te tromper.",
+    "Montrez vos galeries photo : celui dont le dernier selfie est le plus ancien perd.",
+    "Tour de table : une marque de céréales ou de biscuits. Le premier qui sèche perd.",
+    "Debout sur un pied, les yeux fermés, pendant 20 secondes. Le premier qui pose le pied perd.",
+    "Tout le monde se tient la main : celui qui a la main la plus froide perd."
+  ];
+
+  function shuffle(a) { a = a.slice(); for (var i = a.length - 1; i > 0; i--) { var j = rnd(i + 1); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+  function rnd(n) { var b = new Uint32Array(1); crypto.getRandomValues(b); return b[0] % n; }
+  function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]; }); }
+
+  var S = { players: [], drawn: [], words: shuffle(WORDS), chal: shuffle(CHALLENGES.map(function (_, i) { return i; })), chalPos: 0, started: false, ghost: true, sound: true };
+  try { var saved = JSON.parse(localStorage.getItem(KEY) || "null"); if (saved && Array.isArray(saved.players)) S = Object.assign(S, saved); } catch (e) {}
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
+  var $ = function (id) { return document.getElementById(id); };
+
+  /* ---------- Audio & voice ---------- */
+  var ctx = null;
+  function audio() {
+    if (!ctx) { try { ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { ctx = null; } }
+    if (ctx && ctx.state === "suspended") ctx.resume();
+    return ctx;
+  }
+  function spooky() {
+    if (!S.sound) return;
+    var c = audio(); if (!c) return;
+    var t = c.currentTime, out = c.createGain();
+    out.gain.setValueAtTime(0.0001, t); out.gain.exponentialRampToValueAtTime(0.5, t + 0.4); out.gain.exponentialRampToValueAtTime(0.0001, t + 4.5);
+    out.connect(c.destination);
+    [55, 58.3, 82.4].forEach(function (f) {
+      var o = c.createOscillator(); o.type = "sawtooth"; o.frequency.setValueAtTime(f, t); o.frequency.linearRampToValueAtTime(f * 0.94, t + 4.5);
+      var lp = c.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 320;
+      var g = c.createGain(); g.gain.value = 0.18;
+      o.connect(lp); lp.connect(g); g.connect(out); o.start(t); o.stop(t + 4.6);
+    });
+    var len = c.sampleRate * 4.5, buf = c.createBuffer(1, len, c.sampleRate), d = buf.getChannelData(0);
+    for (var i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    var src = c.createBufferSource(); src.buffer = buf;
+    var bp = c.createBiquadFilter(); bp.type = "bandpass"; bp.Q.value = 6;
+    bp.frequency.setValueAtTime(300, t); bp.frequency.linearRampToValueAtTime(1400, t + 1.6); bp.frequency.linearRampToValueAtTime(400, t + 4.4);
+    var wg = c.createGain(); wg.gain.value = 0.35;
+    src.connect(bp); bp.connect(wg); wg.connect(out); src.start(t); src.stop(t + 4.5);
+  }
+  var frVoice = null;
+  function pickVoice() {
+    if (!("speechSynthesis" in window)) return;
+    var vs = speechSynthesis.getVoices().filter(function (v) { return /^fr/i.test(v.lang); });
+    var male = vs.filter(function (v) { return /thomas|male|homme|daniel|paul|nicolas|henri|google/i.test(v.name); });
+    frVoice = male[0] || vs[0] || null;
+  }
+  if ("speechSynthesis" in window) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
+  function say(text, delay) {
+    if (!S.sound || !("speechSynthesis" in window)) return;
+    setTimeout(function () {
+      try {
+        speechSynthesis.cancel();
+        var u = new SpeechSynthesisUtterance(text);
+        u.lang = "fr-FR"; if (frVoice) u.voice = frVoice;
+        u.pitch = 0.1; u.rate = 0.72; u.volume = 1;
+        speechSynthesis.speak(u);
+      } catch (e) {}
+    }, delay || 0);
+  }
+  function unlockVoice() {
+    audio();
+    if ("speechSynthesis" in window) { try { var u = new SpeechSynthesisUtterance(" "); u.volume = 0; speechSynthesis.speak(u); } catch (e) {} }
+  }
+
+  /* ---------- Setup ---------- */
+  function renderSetup() {
+    $("chips").innerHTML = S.players.map(function (p, i) {
+      return '<span class="chip">' + esc(p.name) + '<button type="button" data-i="' + i + '" aria-label="Retirer ' + esc(p.name) + '">✕</button></span>';
+    }).join("");
+    $("startBtn").disabled = S.players.length < 2;
+  }
+  $("addForm").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var v = $("nameInput").value.trim();
+    if (!v) return;
+    if (S.players.some(function (p) { return p.name.toLowerCase() === v.toLowerCase(); })) { $("setupHint").textContent = v + " est déjà dans la partie."; return; }
+    S.players.push({ name: v, joker: true });
+    $("nameInput").value = ""; $("nameInput").focus();
+    $("setupHint").textContent = "Ajoute au moins 2 joueurs. Monte le son du téléphone : le Fantôme parle.";
+    save(); renderSetup();
+  });
+  $("chips").addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-i]"); if (!b) return;
+    S.players.splice(+b.dataset.i, 1); save(); renderSetup();
+  });
+  $("startBtn").addEventListener("click", function () {
+    unlockVoice();
+    S.started = true; S.wordIdx = 0; save(); show();
+    say("Que la nuit commence. Le mot interdit est… " + wordNow() + ".", 200);
+    flashWord();
+    armGhost(); wake();
+  });
+
+  /* ---------- Game ---------- */
+  function wordNow() { return S.words[Math.floor(S.drawn.length / 4) % S.words.length]; }
+  function renderGame() {
+    var left = 4 - (S.drawn.length % 4);
+    $("word").textContent = "« " + wordNow() + " »";
+    $("wordLeft").textContent = S.drawn.length >= MAX ? "" : "change dans " + left + " case" + (left > 1 ? "s" : "");
+    $("challenge").textContent = CHALLENGES[S.chal[S.chalPos % S.chal.length]];
+    $("count").textContent = S.drawn.length + " / " + MAX;
+    var last = S.drawn.length ? S.drawn[S.drawn.length - 1].n : 0;
+    var html = "";
+    for (var i = 1; i <= MAX; i++) {
+      var d = S.drawn.filter(function (x) { return x.n === i; })[0];
+      html += '<div class="cell' + (d ? " open" : "") + (i === last ? " last" : "") + '"><span class="n">' + i + "</span>" + (d ? '<span class="who">' + esc(d.p) + "</span>" : "") + "</div>";
+    }
+    $("board").innerHTML = html;
+    var rows = S.players.map(function (p) {
+      var mine = S.drawn.filter(function (x) { return x.p === p.name; }).map(function (x) { return x.n; });
+      return { p: p, mine: mine };
+    }).sort(function (a, b) { return b.mine.length - a.mine.length; });
+    $("scores").innerHTML = rows.map(function (r) {
+      return '<li><span class="nm">' + esc(r.p.name) + '</span><span class="cs">' + (r.mine.length ? r.mine.join(", ") : "—") + '</span><span class="jk' + (r.p.joker ? "" : " used") + '">joker</span><span class="ct">' + r.mine.length + "</span></li>";
+    }).join("");
+    var full = S.drawn.length >= MAX;
+    $("lostBtn").disabled = full; $("saidBtn").disabled = full; $("againBtn").disabled = full;
+    $("ghostToggle").className = "small" + (S.ghost ? " on" : "");
+    $("ghostToggle").textContent = S.ghost ? "Fantôme activé" : "Fantôme endormi";
+    $("ghostbar").className = "ghostbar" + (S.ghost && !full ? " live" : "");
+    $("ghostTxt").textContent = full ? "Le Fantôme est repu" : S.ghost ? "Le Fantôme rôde…" : "Le Fantôme dort";
+    $("soundToggle").className = "small" + (S.sound ? " on" : "");
+    $("soundToggle").textContent = S.sound ? "Son activé" : "Son coupé";
+  }
+  function show() {
+    $("setup").hidden = S.started; $("game").hidden = !S.started;
+    if (S.started) renderGame(); else renderSetup();
+  }
+
+  $("nextChal").addEventListener("click", function () { S.chalPos++; save(); renderGame(); });
+
+  /* Picker */
+  var pickCb = null;
+  function pick(title, exclude, cb) {
+    $("pickCancel").onclick = null;
+    $("pickTitle").textContent = title;
+    $("pickList").innerHTML = S.players.filter(function (p) { return p.name !== exclude; }).map(function (p) {
+      return '<button type="button" data-n="' + esc(p.name) + '">' + esc(p.name) + "</button>";
+    }).join("");
+    pickCb = cb; $("picker").hidden = false;
+  }
+  $("pickList").addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-n]"); if (!b) return;
+    $("picker").hidden = true; var cb = pickCb; pickCb = null; cb && cb(b.dataset.n);
+  });
+  $("pickCancel").addEventListener("click", function () { $("picker").hidden = true; pickCb = null; });
+
+  $("lostBtn").addEventListener("click", function () {
+    unlockVoice();
+    pick("Qui a perdu le défi ?", null, function (name) { S.chalPos++; victim(name, "lost"); });
+  });
+  $("againBtn").addEventListener("click", function () {
+    unlockVoice();
+    pick("Qui doit ouvrir une autre case ?", null, function (name) { victim(name, "again"); });
+  });
+  $("saidBtn").addEventListener("click", function () {
+    unlockVoice();
+    pick("Qui a dit « " + wordNow() + " » ?", null, function (name) { victim(name, "word"); });
+  });
+
+  /* Draw + reveal */
+  var current = null;
+  function drawNumber() {
+    var pool = [];
+    for (var i = 1; i <= MAX; i++) if (!S.drawn.some(function (x) { return x.n === i; })) pool.push(i);
+    return pool.length ? pool[rnd(pool.length)] : 0;
+  }
+  var LINES = {
+    lost: { r: "Défi perdu", s: function (n, k) { return n + "… tu as perdu. Va ouvrir… la case " + k + "."; } },
+    word: { r: "Mot interdit", s: function (n, k) { return n + "… tu as prononcé le mot interdit. Case " + k + "."; } },
+    ghost: { r: "Le Fantôme frappe", s: function (n, k) { return "Le fantôme… a choisi… " + n + ". Case " + k + "."; } },
+    again: { r: "Le meuble en redemande", s: function (n, k) { return n + "… le meuble n'en a pas fini avec toi. Case " + k + "."; } },
+    joker: { r: "Joker !", s: function (n, k) { return "Joker. " + n + "… la case " + k + " est pour toi."; } }
+  };
+  function victim(name, reason) {
+    var k = drawNumber(); if (!k) return;
+    S.drawn.push({ n: k, p: name }); save();
+    current = { k: k, p: name, reason: reason, jokered: false };
+    reveal();
+    renderGame();
+  }
+  function reveal() {
+    var c = current, L = LINES[c.reason];
+    $("revReason").textContent = L.r;
+    $("revName").innerHTML = Array.from(c.p).map(function (ch, i) { return '<span style="animation-delay:' + (0.5 + i * 0.09).toFixed(2) + 's">' + (ch === " " ? "&nbsp;" : esc(ch)) + "</span>"; }).join("");
+    $("revName").style.fontSize = c.p.length > 14 ? "clamp(1.8rem, 9vw, 3rem)" : c.p.length > 9 ? "clamp(2.4rem, 12vw, 4rem)" : "";
+    $("revNum").textContent = c.k;
+    var pl = S.players.filter(function (p) { return p.name === c.p; })[0];
+    $("revJoker").hidden = !(pl && pl.joker) || c.jokered || S.players.length < 2;
+    ["revDrawer", "revActions"].forEach(function (id) { var el = $(id); el.style.animationName = "none"; void el.offsetWidth; el.style.animationName = ""; });
+    var ov = $("reveal"); ov.hidden = false; ov.classList.remove("shake"); void ov.offsetWidth; ov.classList.add("shake");
+    spooky();
+    say(L.s(c.p, c.k), c.reason === "ghost" ? 700 : 400);
+  }
+  $("revRepeat").addEventListener("click", function () { if (current) say(LINES[current.reason].s(current.p, current.k)); });
+  $("revJoker").addEventListener("click", function () {
+    var from = current.p;
+    $("reveal").hidden = true;
+    pick(from + " refile la case " + current.k + " à…", from, function (to) {
+      S.players.forEach(function (p) { if (p.name === from) p.joker = false; });
+      S.drawn.forEach(function (x) { if (x.n === current.k) x.p = to; });
+      current.p = to; current.reason = "joker"; current.jokered = true;
+      save(); renderGame(); reveal();
+    });
+    $("pickCancel").onclick = function () { $("pickCancel").onclick = null; $("reveal").hidden = false; };
+  });
+  $("revOk").addEventListener("click", function () {
+    $("reveal").hidden = true; current = null;
+    if ("speechSynthesis" in window) speechSynthesis.cancel();
+    if (S.drawn.length >= MAX) showEnd();
+    else checkWordChange();
+    armGhost();
+  });
+
+  function flashWord() {
+    var el = $("wordPanel"); el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash");
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+  function checkWordChange() {
+    var idx = Math.floor(S.drawn.length / 4);
+    if (S.wordIdx === undefined) S.wordIdx = idx;
+    if (idx === S.wordIdx) return;
+    S.wordIdx = idx; save();
+    flashWord();
+    if (S.sound) spooky();
+    say("Attention… le mot interdit change. Le nouveau mot interdit est… " + wordNow() + ".", 500);
+  }
+  function showEnd() {
+    var rows = S.players.map(function (p) { return { n: p.name, c: S.drawn.filter(function (x) { return x.p === p.name; }).length }; }).sort(function (a, b) { return b.c - a.c; });
+    $("endList").innerHTML = rows.map(function (r, i) { return '<li><span class="rk">' + (i + 1) + '</span><span class="nm">' + esc(r.n) + "</span><span>" + r.c + " case" + (r.c > 1 ? "s" : "") + "</span></li>"; }).join("");
+    $("end").hidden = false;
+    if (rows.length) say("Le meuble est vide. " + rows[0].n + "… a le plus souffert cette nuit.", 300);
+  }
+  $("endClose").addEventListener("click", function () { $("end").hidden = true; });
+
+  /* Ghost timer */
+  var ghostAt = 0;
+  function armGhost() { ghostAt = Date.now() + (4 + Math.random() * 6) * 60000; }
+  setInterval(function () {
+    if (!S.started || !S.ghost || S.drawn.length >= MAX || S.players.length < 1) return;
+    if (!$("reveal").hidden || !$("picker").hidden || !$("end").hidden || document.hidden) return;
+    if (!ghostAt) armGhost();
+    if (Date.now() >= ghostAt) {
+      ghostAt = Infinity;
+      victim(S.players[rnd(S.players.length)].name, "ghost");
+    }
+  }, 1000);
+  $("ghostToggle").addEventListener("click", function () { S.ghost = !S.ghost; save(); armGhost(); renderGame(); });
+  $("soundToggle").addEventListener("click", function () { S.sound = !S.sound; if (!S.sound && "speechSynthesis" in window) speechSynthesis.cancel(); else unlockVoice(); save(); renderGame(); });
+
+  /* Wake lock */
+  var lock = null;
+  function wake() { try { if (navigator.wakeLock) navigator.wakeLock.request("screen").then(function (l) { lock = l; }).catch(function () {}); } catch (e) {} }
+  document.addEventListener("visibilitychange", function () { if (!document.hidden && S.started) wake(); });
+
+  /* Reset */
+  function footDefault() {
+    $("resetBtn").hidden = false;
+    var c = $("confirmRow"); if (c) c.remove();
+  }
+  $("resetBtn").addEventListener("click", function () {
+    $("resetBtn").hidden = true;
+    var row = document.createElement("div"); row.className = "row center"; row.id = "confirmRow";
+    row.innerHTML = '<button class="small danger" id="yesReset" type="button">Oui, tout recommencer</button><button class="small" id="noReset" type="button">Annuler</button>';
+    $("foot").appendChild(row);
+    $("noReset").focus();
+    $("noReset").onclick = footDefault;
+    $("yesReset").onclick = function () {
+      S.drawn = []; S.started = false; S.words = shuffle(WORDS); S.chal = shuffle(CHALLENGES.map(function (_, i) { return i; })); S.chalPos = 0;
+      S.players.forEach(function (p) { p.joker = true; });
+      save(); footDefault(); show();
+    };
+  });
+
+  document.addEventListener("pointerdown", function once() { unlockVoice(); document.removeEventListener("pointerdown", once); });
+  show();
+  if (S.started) { armGhost(); }
+})();
+</script>
+
+</body>
+</html>
