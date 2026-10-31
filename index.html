@@ -512,7 +512,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--slime); out
   function victim(name, reason) {
     var k = drawNumber(); if (!k) return;
     S.drawn.push({ n: k, p: name }); save();
-    current = { k: k, p: name, reason: reason, jokered: false };
+    current = { k: k, p: name, reason: reason, jokered: false, fromGhost: reason === "ghost" };
     reveal();
     renderGame();
   }
@@ -542,11 +542,12 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--slime); out
     $("pickCancel").onclick = function () { $("pickCancel").onclick = null; $("reveal").hidden = false; };
   });
   $("revOk").addEventListener("click", function () {
+    var wasGhost = current && current.fromGhost;
     $("reveal").hidden = true; current = null;
     if ("speechSynthesis" in window) speechSynthesis.cancel();
     if (S.drawn.length >= MAX) showEnd();
     else checkWordChange();
-    armGhost();
+    if (wasGhost) armGhost();
   });
 
   /* ---------- Chrono + anxious music ---------- */
@@ -658,7 +659,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--slime); out
   }
   function closeTimer() {
     if (TM && !TM.done) finishTimer(false);
-    TM = null; $("timer").hidden = true; armGhost();
+    TM = null; $("timer").hidden = true;
   }
   $("chronoBtn").addEventListener("click", function () {
     var t = CHALLENGES[S.chal[S.chalPos % S.chal.length]];
@@ -693,18 +694,22 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--slime); out
   $("endClose").addEventListener("click", function () { $("end").hidden = true; });
 
   /* Ghost timer */
-  var ghostAt = 0;
-  function armGhost() { ghostAt = Date.now() + (4 + Math.random() * 6) * 60000; }
+  /* The ghost's clock is never reset by other cases: it is armed at start, when re-enabled,
+     and after its own strike. If it comes due while something is on screen, it waits for
+     the screen to be clear for GRACE ms, then strikes. */
+  var GRACE = 15000, busySince = 0;
+  function armGhost() { S.ghostAt = Date.now() + (4 + Math.random() * 4) * 60000; save(); }
+  function busy() { return !$("reveal").hidden || !$("picker").hidden || !$("end").hidden || !$("timer").hidden || document.hidden; }
   setInterval(function () {
     if (!S.started || !S.ghost || S.drawn.length >= MAX || S.players.length < 1) return;
-    if (!$("reveal").hidden || !$("picker").hidden || !$("end").hidden || !$("timer").hidden || document.hidden) return;
-    if (!ghostAt) armGhost();
-    if (Date.now() >= ghostAt) {
-      ghostAt = Infinity;
+    if (!S.ghostAt) armGhost();
+    if (busy()) { busySince = Date.now(); return; }
+    if (Date.now() >= S.ghostAt && Date.now() - busySince >= GRACE) {
+      S.ghostAt = Infinity;
       victim(S.players[rnd(S.players.length)].name, "ghost");
     }
   }, 1000);
-  $("ghostToggle").addEventListener("click", function () { S.ghost = !S.ghost; save(); armGhost(); renderGame(); });
+  $("ghostToggle").addEventListener("click", function () { S.ghost = !S.ghost; if (S.ghost) armGhost(); else save(); renderGame(); });
   $("soundToggle").addEventListener("click", function () { S.sound = !S.sound; if (!S.sound && "speechSynthesis" in window) speechSynthesis.cancel(); else unlockVoice(); save(); renderGame(); });
 
   /* Wake lock */
@@ -733,7 +738,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--slime); out
 
   document.addEventListener("pointerdown", function once() { unlockVoice(); document.removeEventListener("pointerdown", once); });
   show();
-  if (S.started) { armGhost(); }
+  if (S.started && !S.ghostAt) { armGhost(); }
 })();
 </script>
 
